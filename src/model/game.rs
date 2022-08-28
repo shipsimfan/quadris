@@ -4,6 +4,12 @@ use super::{
 };
 use colosseum::{Input, Window};
 
+pub enum ARE {
+    None,
+    ARE(u8),
+    LineDelay(u8, Vec<isize>),
+}
+
 pub struct Game {
     board: Board,
     level: usize,
@@ -88,6 +94,32 @@ impl Game {
         });
     }
 
+    pub fn collapse(&mut self, lines: &[isize]) {
+        self.board.collapse(lines);
+
+        // Update score
+        self.add_score(
+            (self.level + 1)
+                * match lines.len() {
+                    0 => 0,
+                    1 => 40,
+                    2 => 100,
+                    3 => 300,
+                    4 => 1200,
+                    _ => panic!("Impossible number of lines cleared!"),
+                },
+        );
+
+        // Update level
+        self.lines_cleared += lines.len();
+
+        if self.lines_cleared >= self.lines_target {
+            self.lines_cleared = 0;
+            self.level += 1;
+            self.lines_target += 10;
+        }
+    }
+
     pub fn finish_are<I: Input>(&mut self, window: &mut Window<I>) -> bool {
         // Generate new piece
         let mut piece = Piece::new(self.piece_generator.next_piece_class(), window);
@@ -109,7 +141,7 @@ impl Game {
         false
     }
 
-    pub fn move_down(&mut self, soft_drop: bool) -> Option<(u8, bool)> {
+    pub fn move_down(&mut self, soft_drop: bool) -> Option<ARE> {
         match self.current_piece.as_mut() {
             Some(current_piece) => {
                 current_piece.move_down();
@@ -145,36 +177,15 @@ impl Game {
         self.board.finalize(current_piece);
         let lines_cleared = self.board.check();
 
-        // Update score
-        self.add_score(
-            (self.level + 1)
-                * match lines_cleared {
-                    0 => 0,
-                    1 => 40,
-                    2 => 100,
-                    3 => 300,
-                    4 => 1200,
-                    _ => panic!("Impossible number of lines cleared!"),
-                },
-        );
-
-        // Update level
-        self.lines_cleared += lines_cleared;
-
-        if self.lines_cleared >= self.lines_target {
-            self.lines_cleared = 0;
-            self.level += 1;
-            self.lines_target += 10;
-        }
-
-        Some((
-            if line_locked < 2 {
+        Some(if lines_cleared.len() == 0 {
+            ARE::ARE(if line_locked < 2 {
                 10
             } else {
                 10 + (((line_locked as u8 - 2) / 4) + 1) * 2
-            },
-            lines_cleared > 0,
-        ))
+            })
+        } else {
+            ARE::LineDelay(0, lines_cleared)
+        })
     }
 
     pub fn render<I: Input>(&mut self, window: &mut Window<I>) {
@@ -184,6 +195,10 @@ impl Game {
             None => {}
         }
         self.next_piece.render(window);
+    }
+
+    pub fn clear_animation(&mut self, step: u8, lines: &[isize]) {
+        self.board.clear_animation(step as isize, lines)
     }
 
     fn add_score(&mut self, score: usize) {

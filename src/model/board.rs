@@ -66,8 +66,8 @@ impl Board {
         }
     }
 
-    pub fn check(&mut self) -> usize {
-        let mut cleared = 0;
+    pub fn check(&self) -> Vec<isize> {
+        let mut cleared = Vec::with_capacity(4);
         'main: for y in 0..BOARD_HEIGHT {
             for x in 0..BOARD_WIDTH {
                 if self.get(x as isize, y as isize).unwrap().is_none() {
@@ -75,16 +75,21 @@ impl Board {
                 }
             }
 
-            cleared += 1;
+            cleared.push(y as isize);
+        }
 
-            for y in (1..y + 1).rev() {
+        cleared
+    }
+
+    pub fn collapse(&mut self, lines: &[isize]) {
+        for line in lines {
+            for y in (1..*line + 1).rev() {
                 for x in 0..BOARD_WIDTH {
                     let tile = self.take(x as isize, y as isize - 1).unwrap();
                     self.set(x as isize, y as isize, tile);
                 }
             }
         }
-        cleared
     }
 
     pub fn render<I: Input>(&mut self, window: &mut Window<I>) {
@@ -93,6 +98,13 @@ impl Board {
                 Some(tile) => tile.render(window),
                 None => {}
             }
+        }
+    }
+
+    pub fn clear_animation(&mut self, step: isize, lines: &[isize]) {
+        for line in lines {
+            self.set(BOARD_WIDTH as isize / 2 - 1 - step, *line, None);
+            self.set(BOARD_WIDTH as isize / 2 + step, *line, None);
         }
     }
 }

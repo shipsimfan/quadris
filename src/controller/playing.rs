@@ -1,5 +1,5 @@
 use super::GameState;
-use crate::model::{Game, BOARD_HEIGHT, BOARD_WIDTH};
+use crate::model::{Game, ARE, BOARD_HEIGHT, BOARD_WIDTH};
 use colosseum::{Camera, Projection, StateTrackingInput, Vector3, Window};
 
 #[derive(PartialEq, Eq)]
@@ -16,12 +16,6 @@ enum DAS {
     Active(DASKey, u8),
 }
 
-enum ARE {
-    None,
-    ARE(u8),
-    LineDelay(u8, u8),
-}
-
 pub struct Playing {
     game: Game,
     camera: Camera,
@@ -30,6 +24,8 @@ pub struct Playing {
     das: DAS,
 
     are: ARE,
+
+    frame_counter: usize,
 }
 
 const DAS_INITIAL_DELAY: u8 = 16;
@@ -58,9 +54,16 @@ impl Playing {
             game,
             camera,
             drop_counter,
+            frame_counter: 0,
             das: DAS::None,
             are: ARE::None,
         })
+    }
+
+    fn finish_are(&mut self, window: &mut Window<StateTrackingInput>) {
+        if self.game.finish_are(window) {
+            panic!("Game Over");
+        }
     }
 }
 
@@ -69,8 +72,12 @@ impl GameState for Playing {
         &mut self,
         window: &mut colosseum::Window<colosseum::StateTrackingInput>,
     ) -> Option<Box<dyn GameState>> {
-        // Update ARE
-        self.are.tick();
+        // Update ARE & frame counter
+        self.frame_counter += 1;
+        match &mut self.are {
+            ARE::ARE(value) => *value -= 1,
+            _ => {}
+        }
 
         // Read input & update game
         if window.input().get_key(b'A') {
@@ -92,14 +99,8 @@ impl GameState for Playing {
         } else if window.input().get_key(b'S') {
             if self.das.add_key_frame(DASKey::Down) {
                 match self.game.move_down(true) {
-                    Some((new_are, line_clear)) => match self.are {
-                        ARE::None => {
-                            if line_clear {
-                                self.are = ARE::LineDelay(20, new_are);
-                            } else {
-                                self.are = ARE::ARE(new_are);
-                            }
-                        }
+                    Some(are) => match self.are {
+                        ARE::None => self.are = are,
                         _ => {}
                     },
                     None => {}
@@ -109,33 +110,44 @@ impl GameState for Playing {
             self.das = DAS::None;
         }
 
-        if self.are.over() {
-            match self.are {
-                ARE::ARE(_) => {
-                    self.are = ARE::None;
-                    if self.game.finish_are(window) {
-                        panic!("Game Over");
-                    }
+        if match &mut self.are {
+            ARE::ARE(step) => {
+                if *step == 0 {
+                    self.finish_are(window);
+                    true
+                } else {
+                    false
                 }
-                ARE::LineDelay(_, new_are) => self.are = ARE::ARE(new_are),
-                ARE::None => {}
             }
-        } else if self.are.none() {
-            if self.drop_counter == 0 {
-                self.drop_counter = self.game.drop_time();
-                match self.game.move_down(false) {
-                    Some((new_are, line_clear)) => {
-                        if line_clear {
-                            self.are = ARE::LineDelay(20, new_are);
-                        } else {
-                            self.are = ARE::ARE(new_are);
-                        }
+            ARE::LineDelay(step, lines_cleared) => {
+                if self.frame_counter % 4 == 0 {
+                    self.game.clear_animation(*step, &lines_cleared);
+                    *step += 1;
+                    if *step == 5 {
+                        self.game.collapse(lines_cleared);
+                        self.finish_are(window);
+                        true
+                    } else {
+                        false
                     }
-                    None => {}
+                } else {
+                    false
                 }
-            } else {
-                self.drop_counter -= 1;
             }
+            ARE::None => {
+                if self.drop_counter == 0 {
+                    self.drop_counter = self.game.drop_time();
+                    match self.game.move_down(false) {
+                        Some(are) => self.are = are,
+                        None => {}
+                    }
+                } else {
+                    self.drop_counter -= 1;
+                }
+                false
+            }
+        } {
+            self.are = ARE::None;
         }
 
         None
@@ -168,29 +180,6 @@ impl DAS {
                     }
                 }
             }
-        }
-    }
-}
-
-impl ARE {
-    pub fn tick(&mut self) {
-        match self {
-            ARE::None => {}
-            ARE::ARE(value) | ARE::LineDelay(value, _) => *value -= 1,
-        }
-    }
-
-    pub fn none(&self) -> bool {
-        match self {
-            ARE::None => true,
-            _ => false,
-        }
-    }
-
-    pub fn over(&self) -> bool {
-        match self {
-            ARE::None => false,
-            ARE::ARE(value) | ARE::LineDelay(value, _) => *value == 0,
         }
     }
 }
