@@ -1,16 +1,15 @@
+use self::playing::{NextState as PlayingNextState, Playing};
+use crate::view::Textures;
+use colosseum::{Input, StateTrackingInput};
+
 mod playing;
 
-pub trait GameState {
-    fn update(
-        &mut self,
-        window: &mut colosseum::Window<colosseum::StateTrackingInput>,
-    ) -> Option<Box<dyn GameState>>;
-
-    fn render(&mut self, window: &mut colosseum::Window<colosseum::StateTrackingInput>);
+pub enum GameState {
+    Playing(Playing),
 }
 
 pub struct Game {
-    current_state: Box<dyn GameState>,
+    current_state: GameState,
 }
 
 impl colosseum::Game for Game {
@@ -20,18 +19,17 @@ impl colosseum::Game for Game {
     const INITIAL_FIXED_UPDATE_DELTA_TIME: Option<f32> = Some(1.0 / 60.0);
 
     fn new(window: &mut colosseum::Window<Self::Input>) -> Self {
+        let textures = Textures::load(window);
+
         Game {
-            current_state: playing::Playing::new(0, window),
+            current_state: playing::Playing::new(0, &textures, window),
         }
     }
 
     fn update(&mut self, _: f32, _: &mut colosseum::Window<Self::Input>) {}
 
     fn fixed_update(&mut self, window: &mut colosseum::Window<Self::Input>) {
-        match self.current_state.update(window) {
-            Some(new_state) => self.current_state = new_state,
-            None => {}
-        }
+        self.current_state.update(window);
     }
 
     fn render(&mut self, window: &mut colosseum::Window<Self::Input>) {
@@ -40,5 +38,25 @@ impl colosseum::Game for Game {
 
     fn clear_color(&self) -> [f32; 4] {
         [0.0, 0.0, 0.0, 1.0]
+    }
+}
+
+impl GameState {
+    pub fn update(&mut self, window: &mut colosseum::Window<StateTrackingInput>) {
+        match self {
+            Self::Playing(playing) => match playing.update(window) {
+                Some(next_state) => match next_state {
+                    PlayingNextState::GameOver => panic!("Game Over!"),
+                    PlayingNextState::Pause => panic!("Pause!"),
+                },
+                None => {}
+            },
+        }
+    }
+
+    pub fn render<I: Input>(&mut self, window: &mut colosseum::Window<I>) {
+        match self {
+            Self::Playing(playing) => playing.render(window),
+        }
     }
 }

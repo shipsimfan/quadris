@@ -1,6 +1,9 @@
 use super::GameState;
-use crate::model::{Game, ARE, BOARD_HEIGHT, BOARD_WIDTH};
-use colosseum::{Camera, Projection, StateTrackingInput, Vector3, Window};
+use crate::{
+    model::{Game, ARE, BOARD_HEIGHT, BOARD_WIDTH},
+    view::{PlayingUI, Textures},
+};
+use colosseum::{Camera, Input, Projection, StateTrackingInput, Vector3, Window};
 
 #[derive(PartialEq, Eq)]
 enum DASKey {
@@ -16,6 +19,11 @@ enum DAS {
     Active(DASKey, u8),
 }
 
+pub enum NextState {
+    GameOver,
+    Pause,
+}
+
 pub struct Playing {
     game: Game,
     camera: Camera,
@@ -26,6 +34,8 @@ pub struct Playing {
     are: ARE,
 
     frame_counter: usize,
+
+    ui: PlayingUI,
 }
 
 const DAS_INITIAL_DELAY: u8 = 16;
@@ -34,44 +44,43 @@ const DAS_REPEAT_DELAY: u8 = 6;
 impl Playing {
     pub fn new(
         starting_level: usize,
+        textures: &Textures,
         window: &mut Window<StateTrackingInput>,
-    ) -> Box<dyn GameState> {
+    ) -> GameState {
         let unit_size = window.height() / BOARD_HEIGHT as f32;
         let width = window.width() / unit_size;
 
         let mut camera = Camera::new(window);
-        camera.set_projection(Projection::orthographic(width, -1.0, 1.0), window);
+        camera.set_projection(Projection::orthographic(width, -0.1, 2.1), window);
         camera.set_position(Vector3::new(
             BOARD_WIDTH as f32 / 2.0 - 0.5,
             BOARD_HEIGHT as f32 / 2.0 + 0.5,
             0.0,
         ));
 
-        let game = Game::new(starting_level, window);
+        let game = Game::new(starting_level, textures.tile().clone(), window);
         let drop_counter = game.drop_time();
+        let ui = PlayingUI::new(&game, 0, textures, window);
 
-        Box::new(Playing {
+        GameState::Playing(Playing {
             game,
             camera,
             drop_counter,
             frame_counter: 0,
             das: DAS::None,
             are: ARE::None,
+            ui,
         })
     }
 
-    fn finish_are(&mut self, window: &mut Window<StateTrackingInput>) {
-        if self.game.finish_are(window) {
-            panic!("Game Over");
-        }
-    }
-}
-
-impl GameState for Playing {
-    fn update(
+    pub fn update(
         &mut self,
         window: &mut colosseum::Window<colosseum::StateTrackingInput>,
-    ) -> Option<Box<dyn GameState>> {
+    ) -> Option<NextState> {
+        if window.input().get_key(0x1B) {
+            return Some(NextState::Pause);
+        }
+
         // Update ARE & frame counter
         self.frame_counter += 1;
         match &mut self.are {
@@ -113,7 +122,9 @@ impl GameState for Playing {
         if match &mut self.are {
             ARE::ARE(step) => {
                 if *step == 0 {
-                    self.finish_are(window);
+                    if self.game.finish_are(window) {
+                        return Some(NextState::GameOver);
+                    }
                     true
                 } else {
                     false
@@ -121,14 +132,16 @@ impl GameState for Playing {
             }
             ARE::LineDelay(step, lines_cleared) => {
                 if self.frame_counter % 4 == 0 {
-                    self.game.clear_animation(*step, &lines_cleared);
-                    *step += 1;
-                    if *step == 5 {
-                        self.game.collapse(lines_cleared);
-                        self.finish_are(window);
-                        true
-                    } else {
+                    if *step < 5 {
+                        self.game.clear_animation(*step, &lines_cleared);
+                        *step += 1;
                         false
+                    } else {
+                        self.game.collapse(lines_cleared);
+                        if self.game.finish_are(window) {
+                            return Some(NextState::GameOver);
+                        }
+                        true
                     }
                 } else {
                     false
@@ -150,11 +163,13 @@ impl GameState for Playing {
             self.are = ARE::None;
         }
 
+        self.ui.update(&self.game);
         None
     }
 
-    fn render(&mut self, window: &mut Window<StateTrackingInput>) {
+    pub fn render<I: Input>(&mut self, window: &mut Window<I>) {
         self.camera.set_active(window);
+        self.ui.render(window);
         self.game.render(window);
     }
 }

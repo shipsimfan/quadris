@@ -1,6 +1,5 @@
-use colosseum::{Input, Sprite, Vector2, Vector4, Window};
-
 use super::BOARD_HEIGHT;
+use colosseum::{Input, Sprite, Texture, Vector2, Vector4, Window};
 
 #[derive(Clone, Copy)]
 pub enum TileColor {
@@ -21,9 +20,10 @@ impl Tile {
     pub fn new<I: Input>(
         color: TileColor,
         position: (isize, isize),
+        texture: Texture,
         window: &mut Window<I>,
     ) -> Self {
-        let mut sprite = Sprite::new(window);
+        let mut sprite = Sprite::new(window, Some(texture));
         sprite.set_tint(color.into());
         sprite.transform_mut().set_position(Vector2::new(
             position.0 as f32,
@@ -34,9 +34,10 @@ impl Tile {
     }
 
     pub fn set_position(&mut self, position: (isize, isize)) {
-        self.sprite
-            .transform_mut()
-            .set_position(Vector2::new(position.0 as f32, BOARD_HEIGHT as f32 - position.1 as f32));
+        self.sprite.transform_mut().set_position(Vector2::new(
+            position.0 as f32,
+            BOARD_HEIGHT as f32 - position.1 as f32,
+        ));
     }
 
     pub fn render<I: Input>(&mut self, window: &mut Window<I>) {

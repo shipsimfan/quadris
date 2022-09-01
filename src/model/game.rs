@@ -2,7 +2,7 @@ use super::{
     board::Board,
     piece::{Piece, PieceGenerator},
 };
-use colosseum::{Input, Window};
+use colosseum::{Input, Texture, Window};
 
 pub enum ARE {
     None,
@@ -16,9 +16,11 @@ pub struct Game {
     score: usize,
     lines_cleared: usize,
     lines_target: usize,
+    total_lines: usize,
     current_piece: Option<Piece>,
     next_piece: Piece,
     piece_generator: PieceGenerator,
+    texture: Texture,
 }
 
 const DROP_TIMES: &[u8] = &[
@@ -28,9 +30,10 @@ const DROP_TIMES: &[u8] = &[
 const MAX_SCORE: usize = 999999;
 
 impl Game {
-    pub fn new<I: Input>(starting_level: usize, window: &mut Window<I>) -> Self {
+    pub fn new<I: Input>(starting_level: usize, texture: Texture, window: &mut Window<I>) -> Self {
         let mut piece_generator = PieceGenerator::from_time();
-        let mut current_piece = Piece::new(piece_generator.next_piece_class(), window);
+        let mut current_piece =
+            Piece::new(piece_generator.next_piece_class(), texture.clone(), window);
         current_piece.set_start_position();
 
         Game {
@@ -40,9 +43,11 @@ impl Game {
             lines_cleared: 0,
             lines_target: (starting_level * 10 + 10)
                 .min((starting_level as isize * 10 - 50).max(100) as usize),
+                total_lines: 0,
             current_piece: Some(current_piece),
-            next_piece: Piece::new(piece_generator.next_piece_class(), window),
+            next_piece: Piece::new(piece_generator.next_piece_class(), texture.clone(), window),
             piece_generator,
+            texture,
         }
     }
 
@@ -56,6 +61,26 @@ impl Game {
         } else {
             DROP_TIMES[self.level]
         }
+    }
+
+    pub fn score(&self) -> usize {
+        self.score
+    }
+
+    pub fn total_lines(&self) -> usize {
+        self.total_lines
+    }
+
+    pub fn level_lines(&self) -> usize {
+        self.lines_cleared
+    }
+
+    pub fn level(&self) -> usize {
+        self.level
+    }
+
+    pub fn stats(&self) -> &[usize] {
+        self.piece_generator.stats()
     }
 
     pub fn rotate_left(&mut self) {
@@ -112,6 +137,7 @@ impl Game {
 
         // Update level
         self.lines_cleared += lines.len();
+        self.total_lines += lines.len();
 
         if self.lines_cleared >= self.lines_target {
             self.lines_cleared = 0;
@@ -122,7 +148,11 @@ impl Game {
 
     pub fn finish_are<I: Input>(&mut self, window: &mut Window<I>) -> bool {
         // Generate new piece
-        let mut piece = Piece::new(self.piece_generator.next_piece_class(), window);
+        let mut piece = Piece::new(
+            self.piece_generator.next_piece_class(),
+            self.texture.clone(),
+            window,
+        );
 
         // Set it as the next piece
         std::mem::swap(&mut self.next_piece, &mut piece);
@@ -142,19 +172,23 @@ impl Game {
     }
 
     pub fn move_down(&mut self, soft_drop: bool) -> Option<ARE> {
-        match self.current_piece.as_mut() {
+        let verify = match self.current_piece.as_mut() {
             Some(current_piece) => {
                 current_piece.move_down();
-                if self.board.verify(current_piece) {
-                    return None;
-                }
+
+                self.board.verify(current_piece)
             }
             None => {
-                if soft_drop {
-                    self.add_score(1);
-                }
                 return None;
             }
+        };
+
+        if soft_drop {
+            self.add_score(1);
+        }
+
+        if verify {
+            return None;
         }
 
         // Get current piece

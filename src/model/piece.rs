@@ -1,4 +1,4 @@
-use colosseum::{Input, Window};
+use colosseum::{Input, Texture, Window};
 use std::time::SystemTime;
 
 use super::{
@@ -7,14 +7,15 @@ use super::{
 };
 
 #[derive(Debug)]
+#[repr(usize)]
 pub enum PieceClass {
-    I,
-    O,
     T,
-    S,
-    Z,
     J,
+    Z,
+    O,
+    S,
     L,
+    I,
 }
 
 struct PieceTile {
@@ -34,6 +35,8 @@ pub struct PieceGenerator {
     mt_tempered: [u32; GEN_SIZE],
     index: usize,
     current_permutation: Vec<PieceClass>,
+
+    stats: [usize; 7],
 }
 
 const GEN_SIZE: usize = 624;
@@ -41,7 +44,7 @@ const PERIOD: usize = 397;
 const DIFF: usize = GEN_SIZE - PERIOD;
 const MAGIC: u32 = 0x9908B0DF;
 
-const PREVIEW_POSITION: (isize, isize) = (-(BOARD_WIDTH as isize) / 2 - 3, 3);
+const PREVIEW_POSITION: (isize, isize) = (-5, 4);
 const DEFAULT_POSITION: (isize, isize) = (BOARD_WIDTH as isize / 2 - 1, 1);
 
 fn convert_even_x(x: isize, even: bool) -> isize {
@@ -80,7 +83,7 @@ fn sum_offsets(position: (isize, isize), offset: (isize, isize), even: bool) -> 
 }
 
 impl Piece {
-    pub fn new<I: Input>(class: PieceClass, window: &mut Window<I>) -> Self {
+    pub fn new<I: Input>(class: PieceClass, texture: Texture, window: &mut Window<I>) -> Self {
         let (offsets, even, color) = match class {
             PieceClass::I => (
                 [(-3, -1), (-1, -1), (1, -1), (3, -1)],
@@ -105,7 +108,12 @@ impl Piece {
 
         Piece {
             tiles: offsets.map(|offset| PieceTile {
-                tile: Tile::new(color, sum_offsets(PREVIEW_POSITION, offset, even), window),
+                tile: Tile::new(
+                    color,
+                    sum_offsets(PREVIEW_POSITION, offset, even),
+                    texture.clone(),
+                    window,
+                ),
                 offset,
             }),
             position: PREVIEW_POSITION,
@@ -135,7 +143,7 @@ impl Piece {
         self.update_positions();
     }
 
-    pub fn rotate_left(&mut self) {
+    pub fn rotate_right(&mut self) {
         self.modified = true;
         for tile in &mut self.tiles {
             let old_x = tile.offset.0;
@@ -144,7 +152,7 @@ impl Piece {
         }
     }
 
-    pub fn rotate_right(&mut self) {
+    pub fn rotate_left(&mut self) {
         self.modified = true;
         for tile in &mut self.tiles {
             let old_x = tile.offset.0;
@@ -211,6 +219,7 @@ impl PieceGenerator {
             mt_tempered: [0; GEN_SIZE],
             index: GEN_SIZE,
             current_permutation: Vec::with_capacity(7),
+            stats: [0; 7],
         }
     }
 
@@ -224,12 +233,18 @@ impl PieceGenerator {
         )
     }
 
+    pub fn stats(&self) -> &[usize] {
+        &self.stats
+    }
+
     pub fn next_piece_class(&mut self) -> PieceClass {
         if self.current_permutation.len() == 0 {
             self.generate_permuation();
         }
 
-        self.current_permutation.pop().unwrap()
+        let ret = self.current_permutation.pop().unwrap();
+        self.stats[ret as usize] += 1;
+        ret
     }
 
     fn generate_permuation(&mut self) {
