@@ -11,8 +11,8 @@ pub struct Background {
 
 impl Background {
     pub fn new<I: Input>(textures: &Textures, window: &mut Window<I>) -> Self {
-        let mut left_pane = Sprite::new(window, Some(textures.background_left().clone()));
-        let mut right_pane = Sprite::new(window, Some(textures.background_right().clone()));
+        let mut left_pane = Sprite::new(Some(textures.background_left().clone()));
+        let mut right_pane = Sprite::new(Some(textures.background_right().clone()));
 
         left_pane
             .transform_mut()

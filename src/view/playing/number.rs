@@ -28,7 +28,7 @@ impl<const DIGITS: usize> Number<DIGITS> {
             let digit = value % 10;
             value /= 10;
 
-            let mut sprite = Sprite::new(window, Some(digit_textures[digit].clone()));
+            let mut sprite = Sprite::new(Some(digit_textures[digit].clone()));
             sprite
                 .transform_mut()
                 .set_position(Vector2::new(i as f32 - offset, 0.0));

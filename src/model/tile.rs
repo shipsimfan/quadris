@@ -23,7 +23,7 @@ impl Tile {
         texture: Texture,
         window: &mut Window<I>,
     ) -> Self {
-        let mut sprite = Sprite::new(window, Some(texture));
+        let mut sprite = Sprite::new( Some(texture));
         sprite.set_tint(color.into());
         sprite.transform_mut().set_position(Vector2::new(
             position.0 as f32,

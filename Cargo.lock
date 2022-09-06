@@ -10,7 +10,7 @@ source = "git+https://github.com/shipsimfan/acsl.git#8a32ab72a21db06fe6496a2b03b
 [[package]]
 name = "alexandria"
 version = "0.1.0"
-source = "git+https://github.com/shipsimfan/alexandria.git#db3a508521917f61fa7c3a1ce5b46cae4bb9218b"
+source = "git+https://github.com/shipsimfan/alexandria.git#065364004f64d92d1da3dbae90ae11295f51b0f3"
 dependencies = [
  "alexandria_common",
  "alexandria_dx11",
@@ -21,7 +21,7 @@ dependencies = [
 [[package]]
 name = "alexandria_common"
 version = "0.1.0"
-source = "git+https://github.com/shipsimfan/alexandria-common.git#d18ad93a0965a61b8f6aa64612210677962a9176"
+source = "git+https://github.com/shipsimfan/alexandria-common.git#684c677e8c53eb472d81f7ea4711a7b7619d8d7a"
 dependencies = [
  "ginger",
 ]
@@ -29,7 +29,7 @@ dependencies = [
 [[package]]
 name = "alexandria_dx11"
 version = "0.1.0"
-source = "git+https://github.com/shipsimfan/alexandria-dx11.git#a59a8e77d7749ef576d9ae7bf0269d153636bc09"
+source = "git+https://github.com/shipsimfan/alexandria-dx11.git#7cf0be6355bcc5fffedafd0230f49fb17a7d8458"
 dependencies = [
  "acsl",
  "alexandria_common",
@@ -51,7 +51,7 @@ dependencies = [
 [[package]]
 name = "colosseum"
 version = "0.1.0"
-source = "git+https://github.com/shipsimfan/colosseum#8bc733849b867ceef8a5ff7ec0c6e8051e69bd26"
+source = "git+https://github.com/shipsimfan/colosseum#60b13e0bbef58031a894ce3212769c467381b063"
 dependencies = [
  "alexandria",
  "ginger",
